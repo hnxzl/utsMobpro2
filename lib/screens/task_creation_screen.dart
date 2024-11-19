@@ -16,9 +16,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
 
   DateTime _selectedDate = DateTime.now();
   String _selectedTag = 'College';
-  String _selectedTimeFrame = 'Today';
-
-  final List<String> _timeFrames = ['Today', 'Week', 'Month'];
+  final List<String> timeFrames = ['Today', 'Week', 'Month'];
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -36,20 +34,35 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
 
   void _createTask() async {
     if (_titleController.text.isNotEmpty) {
+      // Membuat objek task
       final task = Task(
         title: _titleController.text,
         description: _descriptionController.text,
         deadline: _selectedDate,
         tag: _selectedTag,
+        isCompleted: false,
       );
 
+      // Simpan ke database
       await DatabaseHelper.instance.insertTask(task);
 
-      // Clear the text fields after task creation
+      // Reset form dan tutup keyboard
+      FocusScope.of(context).unfocus();
       setState(() {
         _titleController.clear();
         _descriptionController.clear();
+        _selectedDate = DateTime.now();
+        _selectedTag = 'College';
       });
+
+      // Notifikasi sukses
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task created successfully!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a title for the task.')),
+      );
     }
   }
 
@@ -60,11 +73,12 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
         title: const Text('Create Task'),
         backgroundColor: AppColors.brightYellow,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Input Title
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(
@@ -73,6 +87,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
               ),
             ),
             const SizedBox(height: 16),
+
+            // Input Description
             TextField(
               controller: _descriptionController,
               decoration: const InputDecoration(
@@ -82,6 +98,8 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 16),
+
+            // Select Deadline
             Row(
               children: [
                 const Text('Deadline: '),
@@ -95,35 +113,26 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedTimeFrame,
-              decoration: const InputDecoration(
-                labelText: 'Time Frame',
-                border: OutlineInputBorder(),
-              ),
-              items: _timeFrames.map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (newValue) {
-                setState(() {
-                  _selectedTimeFrame = newValue!;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
+
             DropdownButtonFormField<String>(
               value: _selectedTag,
               decoration: const InputDecoration(
                 labelText: 'Tag',
                 border: OutlineInputBorder(),
               ),
-              items: TaskTags.tagColors.keys.map((String value) {
+              items: TaskTags.tagColors.entries.map((entry) {
                 return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
+                  value: entry.key,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 8,
+                        backgroundColor: entry.value, // Warna tag
+                      ),
+                      const SizedBox(width: 8),
+                      Text(entry.key),
+                    ],
+                  ),
                 );
               }).toList(),
               onChanged: (newValue) {
@@ -132,14 +141,17 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                 });
               },
             ),
+
             const SizedBox(height: 30),
+
+            // Tombol untuk membuat task
             ElevatedButton(
               onPressed: _createTask,
               style: ElevatedButton.styleFrom(
                 foregroundColor: AppColors.darkBlue,
                 backgroundColor: AppColors.brightYellow,
               ),
-              child: Text('Create Task'),
+              child: const Text('Create Task'),
             ),
           ],
         ),

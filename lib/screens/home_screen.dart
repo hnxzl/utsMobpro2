@@ -12,7 +12,7 @@ class BottomNavBar extends StatefulWidget {
   const BottomNavBar({super.key, required this.username});
 
   @override
-  _BottomNavBarState createState() => _BottomNavBarState();
+  State<BottomNavBar> createState() => _BottomNavBarState();
 }
 
 class _BottomNavBarState extends State<BottomNavBar> {
@@ -26,7 +26,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
 
   List<Widget> _buildScreens() {
     return [
-      HomeScreen(username: widget.username),
+      HomeScreen(username: widget.username, onRefresh: _onHomeRefresh),
       const TaskCreationScreen(),
       SettingsScreen(username: widget.username),
     ];
@@ -35,67 +35,87 @@ class _BottomNavBarState extends State<BottomNavBar> {
   List<PersistentBottomNavBarItem> _navBarsItems() {
     return [
       PersistentBottomNavBarItem(
-        icon: const Icon(
-          Icons.home,
-          size: 22,
-        ),
+        icon: const Icon(Icons.home),
         title: 'Home',
-        activeColorPrimary: Colors.white,
+        activeColorPrimary: Colors.blue,
         inactiveColorPrimary: Colors.grey,
+        textStyle: const TextStyle(fontSize: 12), // Atur ukuran teks
+        iconSize: 24, // Ukuran ikon
+        onPressed: (context) => _onHomeRefresh(),
       ),
       PersistentBottomNavBarItem(
-        icon: const Icon(Icons.add, size: 22),
+        icon: const Icon(Icons.add),
         title: 'Add Task',
-        activeColorPrimary: Colors.white,
+        activeColorPrimary: Colors.blue,
         inactiveColorPrimary: Colors.grey,
       ),
       PersistentBottomNavBarItem(
-        icon: const Icon(Icons.settings, size: 22),
+        icon: const Icon(Icons.settings),
         title: 'Settings',
-        activeColorPrimary: Colors.white,
+        activeColorPrimary: Colors.blue,
         inactiveColorPrimary: Colors.grey,
       ),
     ];
   }
 
+  void _onHomeRefresh() {
+    if (_controller.index == 0) {
+      HomeScreen.of(context)?.refreshTasks();
+    } else {
+      setState(() {
+        _controller.jumpToTab(0);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: PersistentTabView(
-        context,
-        padding: const EdgeInsets.all(8),
-        controller: _controller,
-        screens: _buildScreens(),
-        items: _navBarsItems(),
-        confineToSafeArea: true,
-        backgroundColor: AppColors.darkBlue,
-        handleAndroidBackButtonPress: true,
-        resizeToAvoidBottomInset: true,
-        stateManagement: true,
-        decoration: NavBarDecoration(
-          borderRadius: BorderRadius.circular(10.0),
-          colorBehindNavBar: AppColors.darkBlue,
-        ),
-        navBarStyle: NavBarStyle.style6,
+    return PersistentTabView(
+      context,
+      controller: _controller,
+      screens: _buildScreens(),
+      items: _navBarsItems(),
+      confineToSafeArea: true,
+      backgroundColor: AppColors.darkBlue,
+      handleAndroidBackButtonPress: true,
+      resizeToAvoidBottomInset: true,
+      decoration: NavBarDecoration(
+        borderRadius: BorderRadius.circular(10.0),
+        colorBehindNavBar: AppColors.darkBlue,
       ),
+      navBarStyle: NavBarStyle.style6,
     );
   }
 }
 
 class HomeScreen extends StatefulWidget {
   final String username;
+  final VoidCallback? onRefresh;
 
-  const HomeScreen({super.key, required this.username});
+  const HomeScreen({super.key, required this.username, this.onRefresh});
+
+  static _HomeScreenState? of(BuildContext context) =>
+      context.findAncestorStateOfType<_HomeScreenState>();
 
   @override
-  // ignore: library_private_types_in_public_api
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Task> _tasks = [];
+  List<Task> _searchResults = [];
   String _currentFilter = 'Today';
-  final String _currentTag = 'All';
+  String _currentTag = 'All';
+  bool _isSearching = false;
+
+  final List<String> _tags = ['All', 'Study', 'Work', 'College', 'Sport'];
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
 
   Future<void> _loadTasks() async {
     final tasks = await DatabaseHelper.instance.getAllTasks();
@@ -104,151 +124,231 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<Task> _filterTasks() {
-    return _tasks.where((task) {
-      // Time filter logic
-      bool timeCondition = _currentFilter == 'Today'
-          ? task.deadline.day == DateTime.now().day
-          : _currentFilter == 'Week'
-              ? task.deadline.difference(DateTime.now()).inDays <= 7
-              : _currentFilter == 'Month'
-                  ? task.deadline.difference(DateTime.now()).inDays <= 30
-                  : true;
-
-      // Tag filter logic
-      bool tagCondition = _currentTag == 'All' || task.tag == _currentTag;
-
-      return timeCondition && tagCondition;
-    }).toList();
+  void refreshTasks() async {
+    final tasks = await DatabaseHelper.instance.getAllTasks();
+    setState(() {
+      _tasks = tasks;
+      _searchResults = [];
+      _isSearching = false;
+    });
   }
 
-  void _toggleTaskCompletion(Task task) async {
-    setState(() {
-      task.isCompleted = !task.isCompleted;
-    });
+  List<Task> _filterTasks() {
+    final tasks = _isSearching ? _searchResults : _tasks;
 
-    if (task.isCompleted) {
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() {
-        _tasks.remove(task);
-      });
-    }
+    return tasks
+        .where((task) {
+          final now = DateTime.now();
+          bool timeCondition = _currentFilter == 'Today'
+              ? task.deadline.day == now.day && task.deadline.month == now.month
+              : _currentFilter == 'Week'
+                  ? task.deadline
+                          .isAfter(now.subtract(Duration(days: now.weekday))) &&
+                      task.deadline
+                          .isBefore(now.add(Duration(days: 7 - now.weekday)))
+                  : _currentFilter == 'Month'
+                      ? task.deadline.month == now.month
+                      : true;
+
+          bool tagCondition = _currentTag == 'All' || task.tag == _currentTag;
+
+          return timeCondition && tagCondition;
+        })
+        .toSet()
+        .toList();
+  }
+
+  void _onSearch(String query) {
+    setState(() {
+      _searchResults = _tasks.where((task) {
+        return task.title.toLowerCase().contains(query.toLowerCase()) ||
+            task.description.toLowerCase().contains(query.toLowerCase());
+      }).toList();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final filteredTasks = _filterTasks();
 
-    return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadTasks,
-          child: Column(
-            children: [
-              // Header Section
-              Container(
-                color: AppColors.darkBlue,
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const CircleAvatar(
-                      backgroundColor: AppColors.brightYellow,
-                      child: Icon(Icons.person, color: Colors.white),
-                    ),
-                    Text(
-                      'TODODO',
-                      style: const TextStyle(
-                        fontSize: 24.0,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.search, color: Colors.white),
-                      onPressed: () {
-                        // Search functionality
-                      },
-                    ),
-                  ],
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header Section
+          Container(
+            color: AppColors.darkBlue,
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const CircleAvatar(
+                  backgroundColor: AppColors.brightYellow,
+                  child: Icon(Icons.person, color: Colors.white),
                 ),
-              ),
-
-              // Greeting and Task Count
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        'Hey, ${widget.username}!',
-                        style: const TextStyle(fontSize: 20),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundColor: Colors.red,
-                      child: Text(
-                        filteredTasks.length.toString(),
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    ),
-                  ],
+                const Text(
+                  'TODODO',
+                  style: TextStyle(
+                    fontSize: 24.0,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-
-              // Time Frame Filters
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: ['Today', 'Week', 'Month'].map((filter) {
-                    return Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: ChoiceChip(
-                        selectedColor: AppColors.darkBlue,
-                        label: Text(filter),
-                        selected: _currentFilter == filter,
-                        onSelected: (selected) {
-                          setState(() {
-                            _currentFilter = filter;
-                          });
-                        },
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-
-              // Task List
-              Expanded(
-                child: ListView.builder(
-                  itemCount: filteredTasks.length,
-                  itemBuilder: (context, index) {
-                    final task = filteredTasks[index];
-                    return ListTile(
-                      title: Text(
-                        task.title,
-                        style: TextStyle(
-                          decoration: task.isCompleted
-                              ? TextDecoration.lineThrough
-                              : TextDecoration.none,
-                        ),
-                      ),
-                      subtitle: Text(task.description),
-                      trailing: Checkbox(
-                        value: task.isCompleted,
-                        onChanged: (_) => _toggleTaskCompletion(task),
-                      ),
-                    );
+                IconButton(
+                  icon: const Icon(Icons.search, color: Colors.white),
+                  onPressed: () {
+                    setState(() {
+                      _isSearching = !_isSearching;
+                      if (!_isSearching) {
+                        _searchController.clear();
+                        _onSearch('');
+                      }
+                    });
                   },
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+
+          // Search Bar
+          if (_isSearching)
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Search tasks...',
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: _onSearch,
+              ),
+            ),
+
+          // Greeting and Task Count
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Hey, ${widget.username}!',
+                    style: const TextStyle(fontSize: 20),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                CircleAvatar(
+                  radius: 12,
+                  backgroundColor: Colors.red,
+                  child: Text(
+                    filteredTasks.length.toString(),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Filters
+          DefaultTabController(
+            length: 2,
+            child: Column(
+              children: [
+                const TabBar(
+                  labelColor: AppColors.darkBlue,
+                  unselectedLabelColor: Colors.grey,
+                  indicatorColor: AppColors.brightYellow,
+                  tabs: [
+                    Tab(text: 'Time Filter'),
+                    Tab(text: 'Tag Filter'),
+                  ],
+                ),
+                Container(
+                  height: 50,
+                  child: TabBarView(
+                    children: [
+                      Center(
+                        child: Wrap(
+                          spacing: 10,
+                          children: ['Today', 'Week', 'Month']
+                              .map((filter) => ChoiceChip(
+                                    selectedColor: AppColors.darkBlue,
+                                    label: Text(filter),
+                                    selected: _currentFilter == filter,
+                                    onSelected: (selected) {
+                                      setState(() {
+                                        _currentFilter = filter;
+                                      });
+                                    },
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                      Center(
+                        child: Wrap(
+                          spacing: 10,
+                          children: _tags
+                              .map((tag) => ChoiceChip(
+                                    selectedColor: AppColors.brightYellow,
+                                    label: Text(tag),
+                                    selected: _currentTag == tag,
+                                    onSelected: (selected) {
+                                      setState(() {
+                                        _currentTag = tag;
+                                      });
+                                    },
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Task List
+          Expanded(
+            child: filteredTasks.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No tasks available!',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: filteredTasks.length,
+                    itemBuilder: (context, index) {
+                      final task = filteredTasks[index];
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 8,
+                          backgroundColor:
+                              TaskTags.tagColors[task.tag] ?? Colors.grey,
+                        ),
+                        title: Text(
+                          task.title,
+                          style: TextStyle(
+                            decoration: task.isCompleted
+                                ? TextDecoration.lineThrough
+                                : TextDecoration.none,
+                          ),
+                        ),
+                        subtitle: Text(task.description),
+                        trailing: Checkbox(
+                          value: task.isCompleted,
+                          onChanged: (_) {
+                            setState(() {
+                              task.isCompleted = !task.isCompleted;
+                            });
+                          },
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }

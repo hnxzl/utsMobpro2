@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yodo/screens/login_screen.dart';
 import '../models/user_model.dart';
 import '../services/database_helper.dart';
 import '../utils/constants.dart';
@@ -30,9 +31,7 @@ class _SignupScreenState extends State<SignupScreen> {
         if (userId > 0) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(username: user.username),
-            ),
+            MaterialPageRoute(builder: (context) => LoginScreen()),
           );
         }
       } catch (e) {
