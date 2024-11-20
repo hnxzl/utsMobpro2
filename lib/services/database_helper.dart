@@ -21,8 +21,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // Versi database ditingkatkan
       onCreate: _createDB,
+      onUpgrade: _upgradeDB, // Migrasi ditangani di sini
     );
   }
 
@@ -34,7 +35,9 @@ class DatabaseHelper {
         description TEXT,
         deadline TEXT,
         tag TEXT,
-        isCompleted INTEGER
+        isCompleted INTEGER,
+        startTime TEXT,
+        endTime TEXT
       )
     ''');
 
@@ -48,6 +51,14 @@ class DatabaseHelper {
     ''');
   }
 
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Tambahkan kolom baru jika upgrade dari versi 1 ke 2
+      await db.execute('ALTER TABLE tasks ADD COLUMN startTime TEXT');
+      await db.execute('ALTER TABLE tasks ADD COLUMN endTime TEXT');
+    }
+  }
+
   Future<int> insertTask(Task task) async {
     final db = await database;
     return await db.insert('tasks', task.toMap());
@@ -57,6 +68,25 @@ class DatabaseHelper {
     final db = await database;
     final taskMaps = await db.query('tasks');
     return taskMaps.map((map) => Task.fromMap(map)).toList();
+  }
+
+  Future<int> updateTask(Task task) async {
+    final db = await database;
+    return await db.update(
+      'tasks',
+      task.toMap(),
+      where: 'id = ?',
+      whereArgs: [task.id],
+    );
+  }
+
+  Future<int> deleteTask(int id) async {
+    final db = await database;
+    return await db.delete(
+      'tasks',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> insertUser(User user) async {

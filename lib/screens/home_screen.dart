@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
+import 'package:yodo/widgets/task_card.dart';
 import '../models/task_model.dart';
 import '../services/database_helper.dart';
 import '../utils/constants.dart';
@@ -321,29 +322,42 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemCount: filteredTasks.length,
                     itemBuilder: (context, index) {
                       final task = filteredTasks[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          radius: 8,
-                          backgroundColor:
-                              TaskTags.tagColors[task.tag] ?? Colors.grey,
-                        ),
-                        title: Text(
-                          task.title,
-                          style: TextStyle(
-                            decoration: task.isCompleted
-                                ? TextDecoration.lineThrough
-                                : TextDecoration.none,
-                          ),
-                        ),
-                        subtitle: Text(task.description),
-                        trailing: Checkbox(
-                          value: task.isCompleted,
-                          onChanged: (_) {
-                            setState(() {
-                              task.isCompleted = !task.isCompleted;
-                            });
-                          },
-                        ),
+                      return TaskCard(
+                        title: task.title,
+                        time:
+                            '${task.startTime.format(context)} - ${task.endTime.format(context)}',
+                        tag1: task.tag, // Tag pertama
+                        tag2: 'Home', // Tambahkan tag lain jika ada
+                        onEdit: () {
+                          // Aksi untuk edit task
+                        },
+                        onDelete: () {
+                          // Tampilkan dialog konfirmasi
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Delete Task'),
+                              content: const Text(
+                                  'Are you sure you want to delete this task?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      // Logika hapus task
+                                      filteredTasks.removeAt(index);
+                                    });
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       );
                     },
                   ),

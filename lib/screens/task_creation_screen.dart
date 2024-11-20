@@ -13,9 +13,10 @@ class TaskCreationScreen extends StatefulWidget {
 class _TaskCreationScreenState extends State<TaskCreationScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-
   DateTime _selectedDate = DateTime.now();
   String _selectedTag = 'College';
+  TimeOfDay _startTime = TimeOfDay(hour: 9, minute: 0); // Default start time
+  TimeOfDay _endTime = TimeOfDay(hour: 17, minute: 0); // Default end time
   final List<String> timeFrames = ['Today', 'Week', 'Month'];
 
   Future<void> _selectDate(BuildContext context) async {
@@ -32,30 +33,57 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
     }
   }
 
+  Future<void> _selectStartTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _startTime,
+    );
+    if (picked != null) {
+      setState(() {
+        _startTime = picked;
+      });
+    }
+  }
+
+  Future<void> _selectEndTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _endTime,
+    );
+    if (picked != null) {
+      setState(() {
+        _endTime = picked;
+      });
+    }
+  }
+
   void _createTask() async {
     if (_titleController.text.isNotEmpty) {
-      // Membuat objek task
       final task = Task(
         title: _titleController.text,
         description: _descriptionController.text,
         deadline: _selectedDate,
         tag: _selectedTag,
         isCompleted: false,
+        startTime: _startTime,
+        endTime: _endTime,
       );
 
-      // Simpan ke database
+      // Save task to database
       await DatabaseHelper.instance.insertTask(task);
 
-      // Reset form dan tutup keyboard
+      // Reset form and dismiss keyboard
       FocusScope.of(context).unfocus();
       setState(() {
         _titleController.clear();
         _descriptionController.clear();
         _selectedDate = DateTime.now();
         _selectedTag = 'College';
+        _startTime = TimeOfDay(hour: 9, minute: 0);
+        _endTime = TimeOfDay(hour: 17, minute: 0);
       });
 
-      // Notifikasi sukses
+      // Show success notification
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Task created successfully!')),
       );
@@ -78,7 +106,6 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Input Title
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(
@@ -88,7 +115,6 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Input Description
             TextField(
               controller: _descriptionController,
               decoration: const InputDecoration(
@@ -114,6 +140,37 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
             ),
             const SizedBox(height: 16),
 
+            // Select Start Time
+            Row(
+              children: [
+                const Text('Start Time: '),
+                TextButton(
+                  onPressed: () => _selectStartTime(context),
+                  child: Text(
+                    _startTime.format(context),
+                    style: const TextStyle(color: AppColors.darkBlue),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Select End Time
+            Row(
+              children: [
+                const Text('End Time: '),
+                TextButton(
+                  onPressed: () => _selectEndTime(context),
+                  child: Text(
+                    _endTime.format(context),
+                    style: const TextStyle(color: AppColors.darkBlue),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Tag Dropdown
             DropdownButtonFormField<String>(
               value: _selectedTag,
               decoration: const InputDecoration(
@@ -127,7 +184,7 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                     children: [
                       CircleAvatar(
                         radius: 8,
-                        backgroundColor: entry.value, // Warna tag
+                        backgroundColor: entry.value,
                       ),
                       const SizedBox(width: 8),
                       Text(entry.key),
@@ -141,10 +198,9 @@ class _TaskCreationScreenState extends State<TaskCreationScreen> {
                 });
               },
             ),
-
             const SizedBox(height: 30),
 
-            // Tombol untuk membuat task
+            // Create Task Button
             ElevatedButton(
               onPressed: _createTask,
               style: ElevatedButton.styleFrom(
