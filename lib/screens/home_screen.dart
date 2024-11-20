@@ -37,8 +37,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
     return [
       PersistentBottomNavBarItem(
         icon: const Icon(Icons.home),
-        title: 'Home',
-        activeColorPrimary: Colors.blue,
+        activeColorPrimary: AppColors.brightYellow,
         inactiveColorPrimary: Colors.grey,
         textStyle: const TextStyle(fontSize: 12), // Atur ukuran teks
         iconSize: 24, // Ukuran ikon
@@ -46,14 +45,12 @@ class _BottomNavBarState extends State<BottomNavBar> {
       ),
       PersistentBottomNavBarItem(
         icon: const Icon(Icons.add),
-        title: 'Add Task',
-        activeColorPrimary: Colors.blue,
+        activeColorPrimary: AppColors.brightYellow,
         inactiveColorPrimary: Colors.grey,
       ),
       PersistentBottomNavBarItem(
         icon: const Icon(Icons.settings),
-        title: 'Settings',
-        activeColorPrimary: Colors.blue,
+        activeColorPrimary: AppColors.brightYellow,
         inactiveColorPrimary: Colors.grey,
       ),
     ];
